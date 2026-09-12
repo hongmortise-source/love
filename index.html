@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#2a0845">
+  <meta name="format-detection" content="telephone=no">
+  <title>刘雨凝 ❤ 洪闻锴</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- 背景：星星与花瓣由 JS 动态铺入 -->
+  <div id="stars"></div>
+  <div id="petals"></div>
+
+  <!-- ================= 登录页 ================= -->
+  <section id="login-page" class="page">
+    <h1 class="login-title">专属恋爱小站</h1>
+    <div class="login-names">刘雨凝 <span class="heart-glyph">❤</span> 洪闻锴</div>
+    <p class="login-sub">—— 你是哪一个呀 ——</p>
+    <div class="login-cards">
+      <button class="login-card tilt-l" data-user="liu">
+        <div class="lc-avatar"><img id="lc-img-liu" src="assets/avatar-liu.jpg" alt="刘雨凝"></div>
+        <div class="lc-name">刘雨凝</div>
+        <div class="lc-tag">🐱 小猫报到</div>
+      </button>
+      <button class="login-card tilt-r" data-user="hong">
+        <div class="lc-avatar"><img id="lc-img-hong" src="assets/avatar-hong.jpg" alt="洪闻锴"></div>
+        <div class="lc-name">洪闻锴</div>
+        <div class="lc-tag">✨ 点我进入</div>
+      </button>
+    </div>
+    <p class="login-foot">愿我们的日子都甜甜的 🌙</p>
+  </section>
+
+  <!-- ================= 主页 ================= -->
+  <section id="main-page" class="page hidden">
+
+    <header class="topbar">
+      <button class="icon-btn" id="switch-user" title="切换身份">⇄</button>
+      <div class="topbar-title">刘雨凝<span class="heart-glyph">❤</span>洪闻锴</div>
+      <div class="music-ctl">
+        <button class="icon-btn" id="next-song" title="下一首" hidden>»</button>
+        <button class="icon-btn music-note" id="music-btn" title="音乐">♪</button>
+      </div>
+    </header>
+
+    <div class="love-stage">
+      <div class="big-heart" id="big-heart"></div>
+      <div class="heart-sparkle">✨</div>
+
+      <div class="avatar-block" id="block-liu">
+        <div class="bubble" id="bubble-liu"></div>
+        <div class="avatar-wrap" data-user="liu" title="点我换头像">
+          <div class="avatar-ring"><img id="img-liu" src="assets/avatar-liu.jpg" alt="刘雨凝"></div>
+          <div class="camera-hint">📷</div>
+        </div>
+        <div class="avatar-name">刘雨凝</div>
+      </div>
+
+      <div class="avatar-block" id="block-hong">
+        <div class="bubble" id="bubble-hong"></div>
+        <div class="avatar-wrap" data-user="hong" title="点我换头像">
+          <div class="avatar-ring"><img id="img-hong" src="assets/avatar-hong.jpg" alt="洪闻锴"></div>
+          <div class="camera-hint">📷</div>
+        </div>
+        <div class="avatar-name">洪闻锴</div>
+      </div>
+    </div>
+
+    <div class="stats">
+      <button class="stat-card days-card" id="stat-days" title="设置纪念日">
+        <span class="stat-label">💗 相爱的天数</span>
+        <span class="days-num"><b id="days-value">--</b><i>天</i></span>
+        <span class="days-hint" id="days-hint">点我设置纪念日</span>
+      </button>
+      <div class="stat-row">
+        <div class="stat-card">
+          <span class="stat-icon">💗</span><b class="stat-num" id="stat-intimacy">0</b><span class="stat-label">亲密值</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-icon">🔥</span><b class="stat-num" id="stat-anger">0</b><span class="stat-label">怒气值</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-icon">😏</span><b class="stat-num" id="stat-pervert">0</b><span class="stat-label">变态值</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button class="action-btn" data-action="heart"><span class="a-icon">💖</span><span class="a-label">发送爱心</span></button>
+      <button class="action-btn" data-action="hammer"><span class="a-icon">🔨</span><span class="a-label">锤子打TA</span></button>
+      <button class="action-btn" data-action="kiss"><span class="a-icon">😘</span><span class="a-label">飞吻一个</span></button>
+      <button class="action-btn" data-action="peek"><span class="a-icon">👀</span><span class="a-label">看看你的</span></button>
+    </div>
+
+  </section>
+
+  <!-- ================= 弹层 ================= -->
+  <div id="fx-layer"></div>
+
+  <div id="anniv-modal" class="modal hidden">
+    <div class="modal-card">
+      <h3>我们的纪念日 💘</h3>
+      <p class="modal-sub">相爱天数从这一天开始算</p>
+      <input type="date" id="anniv-input">
+      <div class="modal-btns">
+        <button class="m-btn ghost" id="anniv-cancel">取消</button>
+        <button class="m-btn primary" id="anniv-save">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="peek-modal" class="modal hidden">
+    <div class="modal-card peek-card">
+      <div class="peek-eyes">👀</div>
+      <h3 id="peek-title">让我看看你的…</h3>
+      <p class="modal-sub" id="peek-sub">变态值 +10</p>
+      <div class="modal-btns single">
+        <button class="m-btn primary" id="peek-close">好啦，收回目光～</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="hidden"></div>
+  <input type="file" id="avatar-file" accept="image/*" hidden>
+
+  <script src="config.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
