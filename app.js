@@ -78,6 +78,14 @@ let me = localStorage.getItem('love_me') || null;
 let fxBusy = false;
 let lastSeenActionTs = 0;
 let achvUnviewed = false;
+const celebratedAt = {};   // 本会话已庆祝过的成就（防止轮询/云端未记上导致重复弹窗）
+const pendingAchv = [];    // 还没写进云端的成就（网络失败自动重试）
+const baselineAchv = new Set(); // 打开页面时就已经达成的"历史成就"：只静默补记，永远不弹庆祝页
+
+/* 记录当前数值下已满足条件的历史成就，作为"不弹窗"基线 */
+function snapshotBaselineAchv() {
+  CONFIG.ACHIEVEMENTS.forEach((a) => { if (achvValue(a) >= a.n) baselineAchv.add(a.id); });
+}
 
 const $ = (id) => document.getElementById(id);
 const fxLayer = $('fx-layer');
@@ -201,6 +209,7 @@ let cloudReady = false;
 
 /* 把云端数据合并进页面（云端是权威数值） */
 function adoptServer(st) {
+  const firstAdopt = !cloudReady;
   ['intimacy', 'anger', 'pervert'].forEach((k) => {
     state[k] = Math.max(0, Math.round(Number(st[k]) || 0));
   });
@@ -215,6 +224,8 @@ function adoptServer(st) {
   if (typeof la === 'string') { try { la = JSON.parse(la); } catch (e) { la = null; } }
   state.lastAction = la || null;
 
+  if (firstAdopt) snapshotBaselineAchv();   // 首次拿到云端数据：记下历史成就基线，避免打开页面就连环弹庆祝
+
   maybeFetchImages(st);
 
   const ts = (la && la.ts) || 0;
@@ -226,7 +237,7 @@ function adoptServer(st) {
     remoteReplay(la);
   }
   renderAll();
-  checkAchievements();
+  checkAchievements(firstAdopt);   // 首次拉取只静默补齐历史成就，不弹庆祝
 }
 
 /* 头像/背景版本号变了才去云端拉图 */
@@ -256,6 +267,7 @@ async function refreshFromCloud(notifyError) {
   if (!Cloud.ok || fxBusy) return;
   try {
     adoptServer(await Cloud.getState());
+    flushAchv();   // 顺手重试之前没写上去的成就
   } catch (e) {
     if (notifyError) toast('云端连接失败，先用本地数据');
   }
@@ -556,6 +568,7 @@ async function doAction(type) {
   state.history.unshift({ text: HIST_TEXT[type], by: me, type, ts: Date.now() });
   saveLocal();
   syncAction(CONFIG.RULES[type], type);
+  checkAchievements();
 
   setTimeout(() => { fxBusy = false; }, 500);
 }
@@ -658,46 +671,88 @@ function achvValue(a) {
   return state.counters[a.type] || 0;
 }
 
-function checkAchievements() {
+/* 成就写入云端：失败留在队列里，每次轮询自动重试 */
+async function flushAchv() {
+  if (!Cloud.ok || !pendingAchv.length) return;
+  const ids = pendingAchv.splice(0, pendingAchv.length);
+  try {
+    await Cloud.writeState({ achNew: ids.map((id) => ({ id })) });
+  } catch (e) {
+    pendingAchv.push(...ids);
+  }
+}
+
+/* silent=true：静默补齐（首次打开时历史成就不弹窗），只在成就按钮上亮个点 */
+function checkAchievements(silent) {
   if (!me) return;
-  const news = [];
+  const news = [];          // 本局真正新解锁的：弹庆祝页
+  let silentCount = 0;      // 打开页面时就已达成的历史成就：只静默补记
   CONFIG.ACHIEVEMENTS.forEach((a) => {
-    if (!state.achievements[a.id] && achvValue(a) >= a.n) {
-      state.achievements[a.id] = Date.now();
+    if (state.achievements[a.id] || celebratedAt[a.id] || achvValue(a) < a.n) return;
+    celebratedAt[a.id] = Date.now();
+    state.achievements[a.id] = celebratedAt[a.id];
+    if (baselineAchv.has(a.id)) {
+      silentCount++;
+      pendingAchv.push(a.id);   // 补写云端
+    } else {
       news.push(a);
     }
   });
-  if (!news.length) return;
-  achvUnviewed = true;
-  renderBadges();
-  celebrateQueue.push(...news);
-  pumpCelebrate();
-  if (Cloud.ok) {
-    Cloud.writeState({ achNew: news.map((a) => ({ id: a.id })) }).catch(() => {});
-  }
+  // 本会话庆祝过但云端还没记上的，盖回本地，防止下一次轮询把它们冲掉
+  Object.keys(celebratedAt).forEach((id) => {
+    state.achievements[id] = state.achievements[id] || celebratedAt[id];
+  });
+  if (!news.length && !silentCount) return;
+
   saveLocal();
+  pendingAchv.push(...news.map((a) => a.id));
+  flushAchv();
+
+  if (news.length) {
+    achvUnviewed = true;
+    renderBadges();
+  }
+  // 静默补齐，或本次只有历史成就 → 只用提示带过，绝不弹庆祝页
+  if (silent || !news.length) {
+    const n = news.length + silentCount;
+    if (n) toast(`🏅 已解锁 ${n} 枚成就，点「成就」查看`, 3000);
+    return;
+  }
+  const show = news.slice(0, 3);   // 一次最多弹 3 个，其余用提示带过
+  celebrateQueue.push(...show);
+  if (news.length > show.length) toast(`还解锁了 ${news.length - show.length} 枚成就 🏅`);
+  pumpCelebrate();
 }
 
 const celebrateQueue = [];
 let celebrating = false;
+let celebrateTimer = null;
+let celebrateStart = 0;   // 本轮庆祝开始时间：超过 30 秒强制收场，杜绝弹窗卡死循环
+
+function endCelebrate(clearQueue) {
+  clearTimeout(celebrateTimer);
+  celebrateTimer = null;
+  if (clearQueue) celebrateQueue.length = 0;
+  $('achv-celebrate').classList.add('hidden');
+  celebrating = false;
+  if (!clearQueue) pumpCelebrate();
+  if (!celebrating && !celebrateQueue.length) celebrateStart = 0;
+}
 
 function pumpCelebrate() {
   if (celebrating || !celebrateQueue.length) return;
+  if (!celebrateStart) celebrateStart = Date.now();
+  if (Date.now() - celebrateStart > 30000) { endCelebrate(true); return; }   // 兜底：庆祝最多连续 30 秒
   celebrating = true;
   const a = celebrateQueue.shift();
   $('achv-c-icon').textContent = a.icon;
   $('achv-c-name').textContent = a.name;
   $('achv-c-desc').textContent = a.desc;
-  const layer = $('achv-celebrate');
-  layer.classList.remove('hidden');
+  $('achv-celebrate').classList.remove('hidden');
   const c = { x: innerWidth / 2, y: innerHeight / 2 };
   burst(c, '🎉', 8);
   setTimeout(() => burst(c, '✨', 6), 350);
-  setTimeout(() => {
-    layer.classList.add('hidden');
-    celebrating = false;
-    pumpCelebrate();
-  }, 2700);
+  celebrateTimer = setTimeout(() => endCelebrate(false), 2700);
 }
 
 function renderAchv() {
@@ -1164,6 +1219,9 @@ function bindUI() {
   });
   $('letter-send').addEventListener('click', sendLetter);
 
+  // 成就庆祝：点一下跳过全部
+  $('achv-celebrate').addEventListener('click', () => endCelebrate(true));
+
   bindMusic();
 }
 
@@ -1171,6 +1229,7 @@ function bindUI() {
   buildBackground();
   bindUI();
   loadLocal();
+  snapshotBaselineAchv();
   renderAll();
   if (me) showMain(); else showLogin();
 
