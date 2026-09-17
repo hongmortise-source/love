@@ -42,6 +42,46 @@ const CONFIG = {
     hong: 'assets/avatar-hong.jpg',   // 洪闻锴
   },
 
+  /* ---------- 礼物小铺（花亲密值购买，价格自己改） ---------- */
+  GIFTS: [
+    { id: 'star',    emoji: '⭐', name: '小星星',   price: 5 },
+    { id: 'rose',    emoji: '🌹', name: '玫瑰花',   price: 10 },
+    { id: 'choc',    emoji: '🍫', name: '巧克力',   price: 20 },
+    { id: 'milktea', emoji: '🧋', name: '奶茶',     price: 30 },
+    { id: 'cat',     emoji: '🐱', name: '小猫咪',   price: 66 },
+    { id: 'bear',    emoji: '🧸', name: '小熊',     price: 88 },
+    { id: 'ring',    emoji: '💍', name: '戒指',     price: 520 },
+    { id: 'crown',   emoji: '👑', name: '皇冠',     price: 999 },
+  ],
+
+  /* ---------- 约会提案的点子库（也可以在页面里自己加） ---------- */
+  DATE_IDEAS: [
+    '一起去看日落', '去吃那家一直想吃的火锅', '窝在家看一部电影',
+    '去游乐园疯一天', '一起做一顿饭', '夜市小吃巡游',
+    '去猫咖撸猫', '打游戏打到半夜', '去江边或湖边散步',
+    '拍一组情侣写真', '一起去逛超市买菜', '说走就走的短途旅行',
+  ],
+
+  /* ---------- 成就徽章（type 对应动作计数 / intimacy 亲密值 / days 相爱天数） ---------- */
+  ACHIEVEMENTS: [
+    { id: 'heart1',    icon: '💖', name: '爱的初体验', desc: '送出第 1 颗爱心',   type: 'heart',    n: 1 },
+    { id: 'heart100',  icon: '💘', name: '爱心轰炸机', desc: '累计送出 100 颗爱心', type: 'heart',  n: 100 },
+    { id: 'heart500',  icon: '🌹', name: '爱意满溢',   desc: '累计送出 500 颗爱心', type: 'heart',  n: 500 },
+    { id: 'hammer1',   icon: '🔨', name: '欢喜冤家',   desc: '第一次锤 TA',        type: 'hammer',   n: 1 },
+    { id: 'hammer100', icon: '💥', name: '锤锤相恋',   desc: '累计锤了 100 次',    type: 'hammer', n: 100 },
+    { id: 'kiss50',    icon: '😘', name: '吻神',       desc: '累计飞吻 50 次',     type: 'kiss',     n: 50 },
+    { id: 'peek20',    icon: '👀', name: '变态观察员', desc: '偷偷看了 20 次',     type: 'peek',     n: 20 },
+    { id: 'gift1',     icon: '🎁', name: '礼尚往来',   desc: '送出第 1 份礼物',    type: 'gift',     n: 1 },
+    { id: 'gift20',    icon: '🏆', name: '豪礼满堂',   desc: '累计送出 20 份礼物', type: 'gift',    n: 20 },
+    { id: 'letter1',   icon: '✉️', name: '见字如面',   desc: '写出第 1 封信',      type: 'letter',   n: 1 },
+    { id: 'letter20',  icon: '💌', name: '情书高手',   desc: '累计写了 20 封信',   type: 'letter',  n: 20 },
+    { id: 'int100',    icon: '💕', name: '甜度超标',   desc: '亲密值达到 100',     type: 'intimacy', n: 100 },
+    { id: 'int520',    icon: '💞', name: '亲亲蜜蜜',   desc: '亲密值达到 520',     type: 'intimacy', n: 520 },
+    { id: 'int1314',   icon: '❤️', name: '一生一世',   desc: '亲密值达到 1314',    type: 'intimacy', n: 1314 },
+    { id: 'days100',   icon: '💯', name: '百日恩恋',   desc: '相爱满 100 天',      type: 'days',     n: 100 },
+    { id: 'days365',   icon: '🎓', name: '一年之约',   desc: '相爱满 365 天',      type: 'days',     n: 365 },
+  ],
+
   /* 两台手机数据同步的间隔（毫秒），3000~10000 都行 */
   SYNC_INTERVAL: 5000,
 };

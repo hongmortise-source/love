@@ -10,6 +10,9 @@
 </head>
 <body>
 
+  <!-- 自定义背景（换背景功能） -->
+  <div id="bg-layer"></div>
+
   <!-- 背景：星星与花瓣由 JS 动态铺入 -->
   <div id="stars"></div>
   <div id="petals"></div>
@@ -40,7 +43,8 @@
     <header class="topbar">
       <button class="icon-btn" id="switch-user" title="切换身份">⇄</button>
       <div class="topbar-title">刘雨凝<span class="heart-glyph">❤</span>洪闻锴</div>
-      <div class="music-ctl">
+      <div class="top-tools">
+        <button class="icon-btn" id="bg-btn" title="换背景（长按恢复默认）">🖼</button>
         <button class="icon-btn" id="next-song" title="下一首" hidden>»</button>
         <button class="icon-btn music-note" id="music-btn" title="音乐">♪</button>
       </div>
@@ -95,10 +99,98 @@
       <button class="action-btn" data-action="peek"><span class="a-icon">👀</span><span class="a-label">看看你的</span></button>
     </div>
 
+    <div class="features">
+      <button class="feat-btn" id="feat-gift"><span class="f-icon">🎁</span><span class="f-label">礼物</span></button>
+      <button class="feat-btn" id="feat-achv"><span class="f-icon">🏅</span><span class="f-label">成就</span><i class="dot hidden" id="dot-achv"></i></button>
+      <button class="feat-btn" id="feat-idea"><span class="f-icon">💡</span><span class="f-label">约会</span></button>
+      <button class="feat-btn" id="feat-time"><span class="f-icon">🕰</span><span class="f-label">时光机</span></button>
+      <button class="feat-btn" id="feat-mail"><span class="f-icon">✉️</span><span class="f-label">信箱</span><i class="dot" id="mail-badge" hidden></i></button>
+    </div>
+
   </section>
 
   <!-- ================= 弹层 ================= -->
   <div id="fx-layer"></div>
+
+  <!-- 功能面板：礼物小铺 -->
+  <div id="sheet-gift" class="sheet hidden">
+    <div class="sheet-head"><b>🎁 礼物小铺</b><button class="icon-btn sheet-close">✕</button></div>
+    <div class="sheet-body">
+      <p class="sheet-tip">送礼物要花 💗亲密值（先攒爱心哦）</p>
+      <div class="gift-grid" id="gift-grid"></div>
+      <div class="gift-confirm hidden" id="gift-confirm">
+        <span id="gift-confirm-text"></span>
+        <div class="gc-btns">
+          <button class="m-btn ghost" id="gift-cancel">再想想</button>
+          <button class="m-btn primary" id="gift-ok">送出 ❤</button>
+        </div>
+      </div>
+      <h4 class="sheet-sub">🖼 我们的橱窗</h4>
+      <div class="gift-show" id="gift-show"><p class="empty-tip">还没送过礼物哦～</p></div>
+    </div>
+  </div>
+
+  <!-- 功能面板：成就 -->
+  <div id="sheet-achv" class="sheet hidden">
+    <div class="sheet-head"><b>🏅 成就徽章</b><button class="icon-btn sheet-close">✕</button></div>
+    <div class="sheet-body">
+      <p class="sheet-tip" id="achv-progress-tip"></p>
+      <div id="achv-list"></div>
+    </div>
+  </div>
+
+  <!-- 功能面板：约会提案 -->
+  <div id="sheet-idea" class="sheet hidden">
+    <div class="sheet-head"><b>💡 约会提案</b><button class="icon-btn sheet-close">✕</button></div>
+    <div class="sheet-body idea-body">
+      <div class="idea-card" id="idea-card">
+        <div class="idea-emoji">🎲</div>
+        <div class="idea-text" id="idea-text">点下面抽一个约会点子</div>
+        <div class="idea-hint" id="idea-hint"></div>
+      </div>
+      <div class="idea-btns">
+        <button class="m-btn ghost" id="idea-draw">🎲 抽一个</button>
+        <button class="m-btn ghost hidden" id="idea-redraw">↻ 换一个</button>
+        <button class="m-btn primary hidden" id="idea-lock">就这个！</button>
+      </div>
+      <h4 class="sheet-sub">✍️ 往愿望池里加一条</h4>
+      <div class="idea-add">
+        <input type="text" id="idea-input" maxlength="40" placeholder="比如：一起去看极光">
+        <button class="m-btn primary" id="idea-add-btn">加入</button>
+      </div>
+      <p class="sheet-tip" id="idea-pool-tip"></p>
+    </div>
+  </div>
+
+  <!-- 功能面板：时光机 -->
+  <div id="sheet-time" class="sheet hidden">
+    <div class="sheet-head"><b>🕰 时光机</b><button class="icon-btn sheet-close">✕</button></div>
+    <div class="sheet-body">
+      <div id="timeline"></div>
+      <p class="empty-tip" id="timeline-empty" hidden>还没有记录，去玩几个按钮吧～</p>
+    </div>
+  </div>
+
+  <!-- 功能面板：信箱 -->
+  <div id="sheet-mail" class="sheet hidden">
+    <div class="sheet-head"><b>✉️ 我们的小信箱</b><button class="icon-btn sheet-close">✕</button></div>
+    <div class="sheet-body">
+      <div id="letter-list"></div>
+      <p class="empty-tip" id="letter-empty" hidden>信箱空空的，给 TA 写一封吧 💌</p>
+
+      <div id="letter-detail" class="hidden">
+        <button class="m-btn ghost back-btn" id="letter-back">← 返回信箱</button>
+        <div class="letter-card">
+          <div class="letter-meta" id="letter-meta"></div>
+          <div class="letter-text" id="letter-text"></div>
+        </div>
+      </div>
+
+      <h4 class="sheet-sub">✍️ 写给 TA</h4>
+      <textarea id="letter-textarea" maxlength="500" rows="4" placeholder="有些话，写下来更甜…（最多500字）"></textarea>
+      <button class="m-btn primary send-btn" id="letter-send">寄出去 💌</button>
+    </div>
+  </div>
 
   <div id="anniv-modal" class="modal hidden">
     <div class="modal-card">
@@ -116,15 +208,27 @@
     <div class="modal-card peek-card">
       <div class="peek-eyes">👀</div>
       <h3 id="peek-title">让我看看你的…</h3>
-      <p class="modal-sub" id="peek-sub">变态值 +10</p>
+      <p class="modal-sub" id="peek-sub">就一眼，就一眼 👉 变态值 +10</p>
       <div class="modal-btns single">
         <button class="m-btn primary" id="peek-close">好啦，收回目光～</button>
       </div>
     </div>
   </div>
 
+  <!-- 成就解锁庆祝 -->
+  <div id="achv-celebrate" class="hidden">
+    <div class="achv-card">
+      <div class="achv-shine">🎉</div>
+      <div class="achv-icon" id="achv-c-icon">🏆</div>
+      <div class="achv-unlock">成 就 解 锁</div>
+      <div class="achv-name" id="achv-c-name"></div>
+      <div class="achv-desc" id="achv-c-desc"></div>
+    </div>
+  </div>
+
   <div id="toast" class="hidden"></div>
   <input type="file" id="avatar-file" accept="image/*" hidden>
+  <input type="file" id="bg-file" accept="image/*" hidden>
 
   <script src="config.js"></script>
   <script src="app.js"></script>

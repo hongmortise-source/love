@@ -26,6 +26,18 @@ img { display: block; }
 
 .kai { font-family: "STKaiti", "KaiTi", "楷体", serif; }
 
+/* ---------------- 自定义背景 ---------------- */
+
+#bg-layer {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  background-size: cover; background-position: center;
+}
+/* 有自定义背景时盖一层深色渐变，保证文字可读 */
+body.has-bg #bg-layer::after {
+  content: ''; position: absolute; inset: 0;
+  background: linear-gradient(168deg, rgba(28, 6, 48, .62) 0%, rgba(15, 3, 28, .78) 55%, rgba(10, 2, 20, .85) 100%);
+}
+
 /* ---------------- 背景：星星 & 花瓣 ---------------- */
 
 #stars, #petals { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
@@ -131,7 +143,7 @@ img { display: block; }
   box-shadow: 0 4px 14px rgba(0, 0, 0, .25);
 }
 .icon-btn:active { transform: scale(.9); }
-.music-ctl { display: flex; gap: 8px; }
+.top-tools { display: flex; gap: 8px; }
 .music-note.playing { animation: spinNote 2.6s linear infinite; color: #ffd89b; border-color: rgba(255, 216, 155, .6); text-shadow: 0 0 10px rgba(255, 216, 155, .9); }
 @keyframes spinNote { to { transform: rotate(360deg); } }
 
@@ -394,3 +406,225 @@ body.shake #main-page { animation: shake .45s ease; }
   #big-heart::before { top: -64px; }
   #big-heart::after { left: 64px; }
 }
+
+/* ============================================================
+   ♥ 功能入口（礼物/成就/约会/时光机/信箱）
+   ============================================================ */
+
+.features {
+  display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px;
+  margin-top: 10px;
+}
+.feat-btn {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 9px 2px 7px; border-radius: 15px;
+  background: linear-gradient(150deg, rgba(255, 255, 255, .09), rgba(255, 255, 255, .04));
+  border: 1px solid rgba(255, 190, 215, .32);
+  transition: transform .12s ease;
+}
+.feat-btn:active { transform: scale(.9); }
+.f-icon { font-size: 20px; filter: drop-shadow(0 0 8px rgba(255, 120, 170, .6)); }
+.f-label { font-size: 11px; letter-spacing: 1px; color: rgba(255, 230, 241, .88); }
+
+.dot {
+  position: absolute; top: -4px; right: 2px;
+  min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px;
+  background: linear-gradient(135deg, #ff5e9c, #ff2d6f);
+  color: #fff; font-size: 10px; font-style: normal; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px solid #1b0630;
+  box-shadow: 0 0 8px rgba(255, 45, 111, .8);
+  animation: pulseHint 1.6s ease-in-out infinite;
+}
+.dot[hidden] { display: none; }
+
+/* ============================================================
+   ♥ 功能面板（全屏抽屉）
+   ============================================================ */
+
+.sheet {
+  position: fixed; inset: 0; z-index: 140;
+  max-width: 480px; margin: 0 auto;
+  display: flex; flex-direction: column;
+  background: linear-gradient(165deg, rgba(46, 12, 70, .98), rgba(18, 4, 34, .99));
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  animation: sheetUp .28s cubic-bezier(.22, 1, .36, 1);
+}
+@keyframes sheetUp { from { transform: translateY(7%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+.sheet-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: calc(env(safe-area-inset-top, 0px) + 12px) 16px 10px;
+  border-bottom: 1px solid rgba(255, 190, 215, .22);
+  font-size: 17px; letter-spacing: 2px; color: #ffe6f1;
+  text-shadow: 0 0 10px rgba(255, 140, 190, .6);
+}
+.sheet-head .icon-btn { width: 34px; height: 34px; font-size: 15px; }
+
+.sheet-body { flex: 1; overflow-y: auto; padding: 14px 16px calc(env(safe-area-inset-bottom, 0px) + 18px); -webkit-overflow-scrolling: touch; }
+.sheet-tip { font-size: 12px; color: rgba(255, 230, 241, .62); letter-spacing: 1px; margin-bottom: 10px; }
+.sheet-sub {
+  margin: 20px 0 10px; font-size: 14px; letter-spacing: 2px; color: #ffd89b;
+  text-shadow: 0 0 8px rgba(255, 190, 120, .4);
+}
+.empty-tip { text-align: center; font-size: 13px; color: rgba(255, 230, 241, .5); padding: 18px 0; letter-spacing: 1px; }
+
+/* ---------------- 礼物小铺 ---------------- */
+
+.gift-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; }
+.gift-item {
+  display: flex; flex-direction: column; align-items: center; gap: 3px;
+  padding: 10px 2px 8px; border-radius: 14px;
+  background: linear-gradient(160deg, rgba(255, 255, 255, .1), rgba(255, 255, 255, .04));
+  border: 1px solid rgba(255, 190, 215, .3);
+  transition: transform .12s ease;
+}
+.gift-item:active { transform: scale(.9); }
+.gift-item .g-emoji { font-size: 26px; filter: drop-shadow(0 0 8px rgba(255, 120, 170, .55)); }
+.gift-item .g-name { font-size: 12px; color: #ffe6f1; }
+.gift-item .g-price { font-size: 11px; color: #ffd89b; }
+.gift-item.poor { opacity: .45; }
+
+.gift-confirm {
+  margin-top: 12px; padding: 12px; border-radius: 14px; text-align: center;
+  background: rgba(255, 45, 111, .12); border: 1px dashed rgba(255, 160, 200, .5);
+  font-size: 14px; color: #ffe6f1;
+}
+.gc-btns { display: flex; gap: 10px; justify-content: center; margin-top: 10px; }
+
+.gift-show { display: grid; grid-template-columns: repeat(4, 1fr); gap: 9px; }
+.gift-owned {
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 9px 2px; border-radius: 14px;
+  background: linear-gradient(160deg, rgba(255, 216, 155, .13), rgba(255, 216, 155, .05));
+  border: 1px solid rgba(255, 216, 155, .4);
+}
+.gift-owned .g-emoji { font-size: 24px; }
+.gift-owned .g-count { font-size: 12px; color: #ffd89b; font-weight: 700; }
+.gift-owned .g-by { font-size: 10px; color: rgba(255, 230, 241, .6); }
+
+/* ---------------- 成就 ---------------- */
+
+.achv-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 12px; border-radius: 14px; margin-bottom: 8px;
+  background: linear-gradient(160deg, rgba(255, 255, 255, .08), rgba(255, 255, 255, .03));
+  border: 1px solid rgba(255, 255, 255, .14);
+}
+.achv-row.got {
+  background: linear-gradient(160deg, rgba(255, 216, 155, .14), rgba(255, 94, 156, .08));
+  border: 1px solid rgba(255, 216, 155, .5);
+  box-shadow: 0 0 14px rgba(255, 216, 155, .12);
+}
+.achv-row .a-face { font-size: 26px; width: 34px; text-align: center; filter: drop-shadow(0 0 8px rgba(255, 190, 120, .5)); }
+.achv-row.locked .a-face { filter: grayscale(1); opacity: .4; }
+.achv-info { flex: 1; min-width: 0; }
+.achv-name { font-size: 14px; color: #fff; letter-spacing: 1px; }
+.achv-row.locked .achv-name { color: rgba(255, 255, 255, .55); }
+.achv-desc { font-size: 11.5px; color: rgba(255, 230, 241, .62); margin-top: 2px; }
+.achv-bar { height: 4px; border-radius: 2px; background: rgba(255, 255, 255, .14); margin-top: 6px; overflow: hidden; }
+.achv-bar i { display: block; height: 100%; border-radius: 2px; background: linear-gradient(90deg, #ff5e9c, #ffd89b); }
+.achv-state { font-size: 11px; color: #ffd89b; white-space: nowrap; }
+
+/* ---------------- 约会提案 ---------------- */
+
+.idea-body { display: flex; flex-direction: column; }
+.idea-card {
+  padding: 30px 18px; border-radius: 20px; text-align: center;
+  background: linear-gradient(160deg, rgba(255, 94, 156, .16), rgba(123, 47, 247, .14));
+  border: 1px solid rgba(255, 190, 215, .4);
+  box-shadow: inset 0 0 30px rgba(255, 255, 255, .04);
+}
+.idea-emoji { font-size: 40px; margin-bottom: 10px; }
+.idea-text { font-size: 21px; letter-spacing: 2px; color: #fff; line-height: 1.5; font-family: "STKaiti", "KaiTi", "楷体", serif; }
+.idea-hint { margin-top: 10px; font-size: 12px; color: rgba(255, 230, 241, .6); letter-spacing: 1px; }
+.idea-btns { display: flex; gap: 10px; justify-content: center; margin-top: 14px; }
+.idea-btns .m-btn { max-width: 140px; }
+
+.idea-add { display: flex; gap: 8px; }
+.idea-add input {
+  flex: 1; padding: 10px 12px; border-radius: 12px; font-size: 14px;
+  background: rgba(255, 255, 255, .1); color: #fff; outline: none;
+  border: 1px solid rgba(255, 255, 255, .25);
+}
+.idea-add .m-btn { max-width: 90px; }
+
+/* ---------------- 时光机 ---------------- */
+
+.tl-item { display: flex; gap: 10px; align-items: flex-start; }
+.tl-rail { display: flex; flex-direction: column; align-items: center; }
+.tl-icon {
+  width: 32px; height: 32px; border-radius: 50%; font-size: 15px;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(160deg, rgba(255, 94, 156, .3), rgba(123, 47, 247, .25));
+  border: 1px solid rgba(255, 190, 215, .45);
+}
+.tl-line { width: 2px; flex: 1; min-height: 14px; background: rgba(255, 190, 215, .2); }
+.tl-item:last-child .tl-line { display: none; }
+.tl-main { flex: 1; padding-bottom: 14px; min-width: 0; }
+.tl-text { font-size: 13.5px; color: #ffe6f1; line-height: 1.5; }
+.tl-time { font-size: 11px; color: rgba(255, 230, 241, .48); margin-top: 2px; letter-spacing: .5px; }
+
+/* ---------------- 信箱 ---------------- */
+
+#letter-list { display: flex; flex-direction: column; gap: 8px; }
+.mail-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 11px 12px; border-radius: 14px; text-align: left;
+  background: linear-gradient(160deg, rgba(255, 255, 255, .08), rgba(255, 255, 255, .03));
+  border: 1px solid rgba(255, 255, 255, .14);
+}
+.mail-item.unread {
+  background: linear-gradient(160deg, rgba(255, 94, 156, .18), rgba(255, 94, 156, .06));
+  border: 1px solid rgba(255, 160, 200, .55);
+  box-shadow: 0 0 12px rgba(255, 45, 111, .15);
+}
+.mail-face { font-size: 20px; }
+.mail-mid { flex: 1; min-width: 0; }
+.mail-from { font-size: 13px; color: #fff; }
+.mail-prev { font-size: 11.5px; color: rgba(255, 230, 241, .55); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mail-state { font-size: 11px; color: rgba(255, 230, 241, .5); white-space: nowrap; }
+.mail-item.unread .mail-state { color: #ff8fb8; }
+
+.back-btn { margin-bottom: 12px; }
+.letter-card {
+  padding: 18px 16px; border-radius: 18px;
+  background: linear-gradient(170deg, #fff, #ffeef5);
+  color: #8d1050;
+  box-shadow: 0 10px 30px rgba(255, 45, 111, .25);
+}
+.letter-meta { font-size: 12px; color: #c06889; margin-bottom: 10px; letter-spacing: 1px; }
+.letter-text { font-size: 15px; line-height: 1.9; white-space: pre-wrap; word-break: break-word; font-family: "STKaiti", "KaiTi", "楷体", serif; }
+
+#letter-textarea {
+  width: 100%; padding: 12px; border-radius: 14px; font-size: 14px; line-height: 1.7;
+  background: rgba(255, 255, 255, .1); color: #fff; outline: none; resize: none;
+  border: 1px solid rgba(255, 255, 255, .25);
+}
+.send-btn { width: 100%; margin-top: 10px; max-width: none; }
+
+/* ---------------- 成就庆祝 ---------------- */
+
+#achv-celebrate {
+  position: fixed; inset: 0; z-index: 180;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(10, 0, 25, .7);
+  backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+}
+.achv-card {
+  width: min(300px, 84vw); padding: 28px 20px; border-radius: 24px; text-align: center;
+  background: linear-gradient(165deg, rgba(84, 24, 118, .97), rgba(30, 8, 52, .97));
+  border: 1.5px solid rgba(255, 216, 155, .65);
+  box-shadow: 0 0 44px rgba(255, 216, 155, .25), 0 18px 50px rgba(0, 0, 0, .5);
+  animation: popIn .4s cubic-bezier(.34, 1.56, .64, 1);
+}
+.achv-shine { font-size: 22px; margin-bottom: 4px; animation: twinkle 1.2s ease-in-out infinite; }
+.achv-icon {
+  font-size: 58px; margin: 6px 0 10px;
+  filter: drop-shadow(0 0 18px rgba(255, 216, 155, .8));
+  animation: beatSmall 1.4s ease-in-out infinite;
+}
+.achv-unlock { font-size: 12px; letter-spacing: 8px; color: #ffd89b; margin-bottom: 8px; }
+.achv-name { font-size: 21px; color: #fff; letter-spacing: 2px; text-shadow: 0 0 12px rgba(255, 140, 190, .7); }
+.achv-desc { margin-top: 8px; font-size: 12.5px; color: rgba(255, 230, 241, .7); }
