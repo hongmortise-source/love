@@ -1,7 +1,17 @@
 // ============================================================
 // ♥ 共享状态云函数（Blob 强一致版）
-//   GET  /api/state  → 读取共享数值
-//   POST /api/state  → 更新共享数值（inc=加减，set=直接设置）
+//   GET  /api/state  → 读取共享数值 + 历史/信件/礼物/成就/愿望池
+//   POST /api/state  → 更新：
+//     inc          数值加减 {intimacy, anger, pervert}
+//     set          直接设置 {anniversary}
+//     lastAction   最近的动作（对方轮询到会回放动画）
+//     count        动作计数 {heart, hammer, kiss, peek, gift, letter}
+//     pushHistory  往时光机加一条 {text, by, type}
+//     gift         送出礼物 {id, by}（累计进橱窗）
+//     letterNew    写一封信 {from, text}
+//     letterRead   标记已读 {id}
+//     ideaAdd      愿望池加一条 {text}
+//     achNew       记录解锁的成就（单个 {id} 或数组 [{id}]）
 // 部署方式：用「GitHub 仓库导入」创建项目（平台会自动安装 package.json
 //   里的依赖并构建），无需在控制台开通任何存储服务。
 // 数据在控制台「存储 → Blob 存储」页面可以看到，命名空间 love，
@@ -19,6 +29,8 @@ const KEY_STATE = 'couple';
 const INITIAL = {
   intimacy: 0, anger: 0, pervert: 0,
   anniversary: '', avatarLiuRev: 0, avatarHongRev: 0, lastAction: null,
+  counters: { heart: 0, hammer: 0, kiss: 0, peek: 0, gift: 0, letter: 0 },
+  history: [], letters: [], gifts: {}, achievements: {}, ideas: null,
 };
 
 function json(data, status = 200) {
@@ -34,8 +46,15 @@ function json(data, status = 200) {
 
 async function readState() {
   const raw = await store.get(KEY_STATE, { type: 'json' });
-  if (!raw) return { ...INITIAL };
-  return { ...INITIAL, ...raw };
+  if (!raw) return JSON.parse(JSON.stringify(INITIAL));
+  const s = { ...INITIAL, ...raw };
+  s.counters = { ...INITIAL.counters, ...(raw.counters || {}) };
+  s.history = Array.isArray(raw.history) ? raw.history : [];
+  s.letters = Array.isArray(raw.letters) ? raw.letters : [];
+  s.gifts = raw.gifts && typeof raw.gifts === 'object' ? raw.gifts : {};
+  s.achievements = raw.achievements && typeof raw.achievements === 'object' ? raw.achievements : {};
+  s.ideas = Array.isArray(raw.ideas) ? raw.ideas : null;
+  return s;
 }
 
 function checkPasscode(request) {
@@ -56,6 +75,8 @@ export async function onRequestPost({ request }) {
   try {
     const body = await request.json();
     const state = await readState();
+    const now = Date.now();
+    const who = (v) => (v === 'hong' ? 'hong' : 'liu');
 
     if (body.inc) {
       ['intimacy', 'anger', 'pervert'].forEach((k) => {
@@ -70,9 +91,75 @@ export async function onRequestPost({ request }) {
     if (body.lastAction && typeof body.lastAction.ts === 'number') {
       state.lastAction = {
         type: String(body.lastAction.type || '').slice(0, 16),
-        by: body.lastAction.by === 'hong' ? 'hong' : 'liu',
+        by: who(body.lastAction.by),
         ts: Math.round(body.lastAction.ts),
       };
+    }
+    if (body.count) {
+      Object.entries(body.count).forEach(([k, n]) => {
+        if (typeof n === 'number' && k in INITIAL.counters) {
+          state.counters[k] = Math.max(0, (state.counters[k] || 0) + Math.round(n));
+        }
+      });
+    }
+    if (body.pushHistory && typeof body.pushHistory.text === 'string') {
+      state.history.unshift({
+        text: body.pushHistory.text.slice(0, 80),
+        by: who(body.pushHistory.by),
+        type: String(body.pushHistory.type || 'sys').slice(0, 12),
+        ts: now,
+      });
+      if (state.history.length > 200) state.history.length = 200;
+    }
+    if (body.gift && typeof body.gift.id === 'string') {
+      const id = body.gift.id.slice(0, 24);
+      const g = state.gifts[id] || { c: 0, by: '', ts: 0 };
+      g.c += 1;
+      g.by = who(body.gift.by);
+      g.ts = now;
+      state.gifts[id] = g;
+    }
+    if (body.letterNew) {
+      const list = Array.isArray(body.letterNew) ? body.letterNew : [body.letterNew];
+      list.forEach((L) => {
+        if (!L || typeof L.text !== 'string') return;
+        const text = L.text.slice(0, 500).trim();
+        if (!text) return;
+        const cid = (typeof L.cid === 'string' && L.cid) ? L.cid.slice(0, 40) : (now + '-' + who(L.from));
+        // 幂等：同一封信（客户端断网重试/并发）只入库一次
+        if (state.letters.some((x) => x.id === cid)) return;
+        state.letters.unshift({
+          id: cid,
+          from: who(L.from),
+          text,
+          ts: typeof L.ts === 'number' ? Math.round(L.ts) : now,
+          read: false,
+        });
+        state.counters.letter = (state.counters.letter || 0) + 1;
+        state.history.unshift({ text: '寄出了一封信', by: who(L.from), type: 'letter', ts: now });
+        if (state.history.length > 200) state.history.length = 200;
+      });
+      if (state.letters.length > 200) state.letters.length = 200;
+    }
+    if (body.letterRead && typeof body.letterRead.id === 'string') {
+      const L = state.letters.find((x) => x.id === body.letterRead.id);
+      if (L) L.read = true;
+    }
+    if (body.ideaAdd && typeof body.ideaAdd.text === 'string') {
+      const t = body.ideaAdd.text.trim().slice(0, 40);
+      if (t) {
+        if (!Array.isArray(state.ideas)) state.ideas = [];
+        if (!state.ideas.includes(t)) {
+          state.ideas.push(t);
+          if (state.ideas.length > 100) state.ideas.shift();
+        }
+      }
+    }
+    if (body.achNew) {
+      const list = Array.isArray(body.achNew) ? body.achNew : [body.achNew];
+      list.forEach((a) => {
+        if (a && typeof a.id === 'string') state.achievements[a.id.slice(0, 24)] = now;
+      });
     }
 
     await store.setJSON(KEY_STATE, state);
