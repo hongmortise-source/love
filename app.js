@@ -80,6 +80,7 @@ let lastSeenActionTs = 0;
 let achvUnviewed = false;
 const celebratedAt = {};   // 本会话已庆祝过的成就（防止轮询/云端未记上导致重复弹窗）
 const pendingAchv = [];    // 还没写进云端的成就（网络失败自动重试）
+const pendingLetters = []; // 还没寄到的信（网络失败/被覆盖自动重试，直到对方收到）
 const baselineAchv = new Set(); // 打开页面时就已经达成的"历史成就"：只静默补记，永远不弹庆祝页
 
 /* 记录当前数值下已满足条件的历史成就，作为"不弹窗"基线 */
@@ -92,6 +93,7 @@ const fxLayer = $('fx-layer');
 const partnerOf = (u) => (u === 'liu' ? 'hong' : 'liu');
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 const fillCall = (s, user) => s.replace(/\{call\}/g, USERS[user].call);
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 function fmtTs(ts) {
   const d = new Date(ts);
@@ -178,7 +180,7 @@ function saveLocal() {
       anniversary: state.anniversary, avatarLiu: state.avatarLiu, avatarHong: state.avatarHong,
       lastAction: state.lastAction, revCache,
       counters: state.counters, history: state.history.slice(0, 60),
-      letters: state.letters.slice(0, 20), gifts: state.gifts,
+      letters: state.letters.slice(0, 100), gifts: state.gifts,
       achievements: state.achievements, ideas: state.ideas, bg: state.bg,
     }));
   } catch (e) { /* 存储满了就算了 */ }
@@ -216,7 +218,7 @@ function adoptServer(st) {
   state.anniversary = st.anniversary || null;
   state.counters = { ...state.counters, ...(st.counters || {}) };
   state.history = Array.isArray(st.history) ? st.history : [];
-  state.letters = Array.isArray(st.letters) ? st.letters : [];
+  const lettersChanged = mergeLetters(st.letters);
   state.gifts = st.gifts || {};
   state.achievements = st.achievements || {};
   state.ideas = Array.isArray(st.ideas) ? st.ideas : null;
@@ -237,7 +239,44 @@ function adoptServer(st) {
     remoteReplay(la);
   }
   renderAll();
+  if (lettersChanged) saveLocal();
   checkAchievements(firstAdopt);   // 首次拉取只静默补齐历史成就，不弹庆祝
+}
+
+/* 云端信件 + 本地未寄出的信合并：轮询不会再把还没寄到的信冲掉 */
+const letterKey = (l) => (l && l.from ? l.from : '?') + '|' + (l && l.text ? l.text : '') + '|' + Math.round(((l && l.ts) || 0) / 60000);
+
+function mergeLetters(serverLetters) {
+  const list = Array.isArray(serverLetters) ? serverLetters.filter((l) => l && l.id) : [];
+  const ids = new Set(list.map((l) => l.id));
+  const keys = new Set(list.map(letterKey));
+  const localOnly = state.letters.filter((l) => l && !ids.has(l.id) && !keys.has(letterKey(l)));
+  localOnly.forEach((l) => {
+    // 自己发的、云端却查无此信 → 说明之前没寄到，自动补进发件队列
+    if (l.from === me && !pendingLetters.some((p) => p.id === l.id)) pendingLetters.push(l);
+  });
+  const before = JSON.stringify(state.letters);
+  state.letters = list.concat(localOnly).sort((a, b) => (b.ts || 0) - (a.ts || 0)).slice(0, 200);
+  return JSON.stringify(state.letters) !== before;
+}
+
+/* 把还没寄到的信投递到云端；失败或被并发覆盖的自动留在队列，下次轮询重试 */
+async function flushLetters() {
+  if (!Cloud.ok || !me || !pendingLetters.length) return;
+  const batch = pendingLetters.splice(0, pendingLetters.length);
+  try {
+    const st = await Cloud.writeState({
+      letterNew: batch.map((l) => ({ cid: l.id, from: l.from, text: l.text, ts: l.ts })),
+      lastAction: (state.lastAction && state.lastAction.type === 'letter' && batch.some((l) => l.ts === state.lastAction.ts)) ? state.lastAction : undefined,
+    });
+    // 云端确认真的存进去了才算寄到（防两台手机同时写入互相覆盖）
+    const okIds = new Set(((st && st.letters) || []).map((l) => l.id));
+    const lost = batch.filter((l) => !okIds.has(l.id));
+    if (lost.length) pendingLetters.unshift(...lost);
+    adoptServer(st);
+  } catch (e) {
+    pendingLetters.unshift(...batch);   // 网络失败：留在队列，下次轮询自动补寄
+  }
 }
 
 /* 头像/背景版本号变了才去云端拉图 */
@@ -267,7 +306,8 @@ async function refreshFromCloud(notifyError) {
   if (!Cloud.ok || fxBusy) return;
   try {
     adoptServer(await Cloud.getState());
-    flushAchv();   // 顺手重试之前没写上去的成就
+    flushAchv();     // 顺手重试之前没写上去的成就
+    flushLetters();  // 顺手重试还没寄到的信
   } catch (e) {
     if (notifyError) toast('云端连接失败，先用本地数据');
   }
@@ -871,24 +911,35 @@ function renderTimeline() {
 function renderMail() {
   const list = $('letter-list');
   list.innerHTML = '';
-  $('letter-empty').hidden = state.letters.length > 0;
-  state.letters.forEach((L) => {
+  const letters = state.letters;
+  const unreadCount = letters.filter((l) => !l.read && l.from !== me).length;
+  $('letter-empty').hidden = letters.length > 0;
+  if (letters.length) {
+    const tip = document.createElement('p');
+    tip.className = 'sheet-tip';
+    tip.textContent = `共 ${letters.length} 封信${unreadCount ? `，${unreadCount} 封未读` : ''}，点一封可以看全文`;
+    list.appendChild(tip);
+  }
+  letters.forEach((L) => {
     const mine = L.from === me;
     const unread = !L.read && !mine;
     const item = document.createElement('button');
     item.className = 'mail-item' + (unread ? ' unread' : '');
+    const name = USERS[L.from] ? USERS[L.from].name : '?';
     item.innerHTML =
-      `<span class="mail-face">${unread ? '💌' : '✉️'}</span>` +
-      `<span class="mail-mid"><span class="mail-from">${USERS[L.from] ? USERS[L.from].name : '?'} 写的</span>` +
-      `<span class="mail-prev">${L.text.slice(0, 26)}</span></span>` +
-      `<span class="mail-state">${mine ? (L.read ? '已读 ✓' : '未读') : (unread ? '新 ✦' : '已读')}</span>`;
+      `<span class="mail-face">${mine ? '📤' : (unread ? '💌' : '✉️')}</span>` +
+      `<span class="mail-mid"><span class="mail-from">${mine ? '我寄出的信' : esc(name) + ' 写来的'}</span>` +
+      `<span class="mail-prev">${esc((L.text || '').slice(0, 40))}</span></span>` +
+      `<span class="mail-side"><span class="mail-time">${fmtTs(L.ts || 0)}</span>` +
+      `<span class="mail-state">${mine ? (L.read ? '对方已读 ✓' : '待对方读') : (unread ? '新 ✦' : '已读')}</span></span>`;
     item.addEventListener('click', () => openLetter(L));
     list.appendChild(item);
   });
 }
 
 async function openLetter(L) {
-  $('letter-meta').textContent = `${USERS[L.from] ? USERS[L.from].name : '?'} · ${fmtTs(L.ts)}`;
+  const name = L.from === me ? '我' : (USERS[L.from] ? USERS[L.from].name : '?');
+  $('letter-meta').textContent = `${name}写于 ${fmtTs(L.ts || 0)}`;
   $('letter-text').textContent = L.text;
   $('letter-list').classList.add('hidden');
   $('letter-empty').classList.add('hidden');
@@ -907,7 +958,11 @@ async function sendLetter() {
   if (!me) return;
   ta.value = '';
   const ts = Date.now();
-  state.letters.unshift({ id: ts + '-tmp', from: me, text, ts, read: false });
+  const letter = {
+    id: ts.toString(36) + '-' + me + '-' + Math.random().toString(36).slice(2, 6),   // 唯一编号，重试也不会寄成两封
+    from: me, text, ts, read: false,
+  };
+  state.letters.unshift(letter);
   state.counters.letter = (state.counters.letter || 0) + 1;
   state.history.unshift({ text: '寄出了一封信', by: me, type: 'letter', ts });
   state.lastAction = { type: 'letter', by: me, ts };
@@ -917,13 +972,8 @@ async function sendLetter() {
   toast('信已寄出 💌');
   flyEmoji('fx-heart', '✉️', centerOf(avatarEl(me)), centerOf(avatarEl(partnerOf(me))), { lift: 80, dur: 800 });
   if (Cloud.ok) {
-    try {
-      adoptServer(await Cloud.writeState({
-        letterNew: { from: me, text },
-        lastAction: state.lastAction,
-        pushHistory: { text: '寄出了一封信', by: me, type: 'letter' },
-      }));
-    } catch (e) { toast('网络开小差了，信稍后补寄'); }
+    pendingLetters.push(letter);
+    flushLetters();   // 寄失败了也不怕，队列里会自动重试，直到对方收到
   }
   checkAchievements();
 }
@@ -969,6 +1019,57 @@ function buildBackground() {
     p.textContent = kinds[i % kinds.length];
     p.style.cssText = `left:${Math.random() * 100}vw;font-size:${12 + Math.random() * 12}px;animation-duration:${9 + Math.random() * 8}s;animation-delay:${-Math.random() * 18}s;opacity:${0.45 + Math.random() * 0.4};`;
     petals.appendChild(p);
+  }
+}
+
+/* ============================================================
+   流星模式（🌠：隐藏按钮和大爱心，播放流星雨）
+============================================================ */
+
+let meteorTimer = null;
+
+function meteorSpawn() {
+  const layer = $('meteors');
+  if (layer.childElementCount > 12) return;   // 手机性能保护
+  const m = document.createElement('i');
+  m.className = 'meteor';
+  // 拖尾长短随机（150~280px），结构：光雾尾 + 锐尾 + 头部光核（样式见 style.css）
+  const tail = 150 + Math.random() * 130;
+  m.innerHTML = `<span class="m-tail" style="width:${Math.round(tail)}px"></span><span class="m-core"></span>`;
+
+  const w = innerWidth, h = innerHeight;
+  // 统一方向：从右上往左下斜飞，约 30° 俯角（±4° 微差，整体仍然一个方向）
+  const ang = (30 + Math.random() * 8) * (Math.PI / 180);
+  const theta = Math.PI - ang;
+  // 起点在屏幕右上带，位移按屏宽折算，全程基本留在屏幕内
+  const startX = w * (0.42 + Math.random() * 0.72);
+  const startY = -20 + Math.random() * h * 0.22;
+  const dist = w * (1.2 + Math.random() * 0.35);
+  const dx = Math.cos(theta) * dist, dy = Math.sin(theta) * dist;
+
+  layer.appendChild(m);
+  animate(m, [
+    { transform: `translate(${startX}px, ${startY}px) rotate(${theta}rad)`, opacity: 0 },
+    { opacity: 1, offset: .05 },
+    { opacity: 1, offset: .85 },
+    { transform: `translate(${startX + dx}px, ${startY + dy}px) rotate(${theta}rad)`, opacity: 0 },
+  ], { duration: 1000 + Math.random() * 450, easing: 'linear' }).then(() => m.remove());
+}
+
+function meteorLoop() {
+  meteorSpawn();
+  meteorTimer = setTimeout(meteorLoop, 180 + Math.random() * 420);
+}
+
+function setZen(on) {
+  document.body.classList.toggle('zen', on);
+  clearTimeout(meteorTimer);
+  meteorTimer = null;
+  if (on) {
+    meteorLoop();
+    toast('流星模式 ✨ 点 🌠 回来', 2200);
+  } else {
+    $('meteors').innerHTML = '';
   }
 }
 
@@ -1218,6 +1319,9 @@ function bindUI() {
     renderMail();
   });
   $('letter-send').addEventListener('click', sendLetter);
+
+  // 流星模式开关
+  $('zen-btn').addEventListener('click', () => setZen(!document.body.classList.contains('zen')));
 
   // 成就庆祝：点一下跳过全部
   $('achv-celebrate').addEventListener('click', () => endCelebrate(true));

@@ -38,6 +38,58 @@ body.has-bg #bg-layer::after {
   background: linear-gradient(168deg, rgba(28, 6, 48, .62) 0%, rgba(15, 3, 28, .78) 55%, rgba(10, 2, 20, .85) 100%);
 }
 
+/* ---------------- 流星模式 ---------------- */
+
+#meteors { position: fixed; inset: 0; pointer-events: none; z-index: 0; overflow: hidden; }
+
+/* 流星 = 容器（负责飞行动画）+ 长尾 + 头部光核 */
+.meteor {
+  position: absolute; left: 0; top: 0;
+  width: 0; height: 0;
+  will-change: transform, opacity;
+}
+.m-tail {
+  position: absolute; right: 0; top: -1.5px;
+  height: 3px; border-radius: 999px;
+  background: linear-gradient(90deg,
+    transparent 0%, rgba(255, 255, 255, .05) 30%,
+    rgba(255, 235, 248, .22) 62%, rgba(255, 255, 255, .65) 88%, #fff 100%);
+  filter: blur(.2px);
+}
+/* 宽而柔的光雾拖尾 */
+.m-tail::before {
+  content: ''; position: absolute; left: 0; right: 0; top: -4px; bottom: -4px;
+  border-radius: 999px;
+  background: linear-gradient(90deg,
+    transparent 0%, rgba(255, 170, 210, .07) 45%,
+    rgba(255, 200, 235, .18) 75%, rgba(255, 240, 250, .4) 96%);
+  filter: blur(3.5px);
+}
+.m-core {
+  position: absolute; left: -4px; top: -4px;
+  width: 8px; height: 8px; border-radius: 50%;
+  background: radial-gradient(circle, #fff 0%, #fff 30%, #ffe9f5 55%, rgba(255, 185, 225, .55) 80%, transparent 100%);
+  box-shadow:
+    0 0 6px 1px rgba(255, 255, 255, .95),
+    0 0 16px 5px rgba(255, 205, 235, .5),
+    0 0 30px 10px rgba(190, 160, 255, .18);
+}
+
+/* 流星模式：淡出所有按钮、大爱心和数值卡（保留布局不跳动） */
+.actions, .features, #stat-days, .stat-row, #big-heart, .heart-sparkle,
+#switch-user, #zen-btn, #bg-btn, #next-song, #music-btn, .camera-hint {
+  transition: opacity .45s ease;
+}
+body.zen .actions, body.zen .features, body.zen #stat-days, body.zen .stat-row,
+body.zen #big-heart, body.zen .heart-sparkle,
+body.zen #switch-user, body.zen #bg-btn, body.zen #next-song, body.zen #music-btn,
+body.zen .camera-hint {
+  opacity: 0; pointer-events: none;
+}
+/* 流星模式下的 🌠 按钮换成幽幽的月亮样式，还能点到（用来退出） */
+body.zen #zen-btn { opacity: .38; }
+body.zen #zen-btn:active { opacity: 1; }
+
 /* ---------------- 背景：星星 & 花瓣 ---------------- */
 
 #stars, #petals { position: fixed; inset: 0; pointer-events: none; z-index: 0; }
@@ -586,6 +638,8 @@ body.shake #main-page { animation: shake .45s ease; }
 .mail-prev { font-size: 11.5px; color: rgba(255, 230, 241, .55); margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mail-state { font-size: 11px; color: rgba(255, 230, 241, .5); white-space: nowrap; }
 .mail-item.unread .mail-state { color: #ff8fb8; }
+.mail-side { display: flex; flex-direction: column; align-items: flex-end; gap: 3px; }
+.mail-time { font-size: 10px; color: rgba(255, 230, 241, .38); white-space: nowrap; }
 
 .back-btn { margin-bottom: 12px; }
 .letter-card {
@@ -628,3 +682,4 @@ body.shake #main-page { animation: shake .45s ease; }
 .achv-unlock { font-size: 12px; letter-spacing: 8px; color: #ffd89b; margin-bottom: 8px; }
 .achv-name { font-size: 21px; color: #fff; letter-spacing: 2px; text-shadow: 0 0 12px rgba(255, 140, 190, .7); }
 .achv-desc { margin-top: 8px; font-size: 12.5px; color: rgba(255, 230, 241, .7); }
+.achv-tap { margin-top: 16px; font-size: 11px; letter-spacing: 2px; color: rgba(255, 230, 241, .45); animation: twinkle 2s ease-in-out infinite; }
