@@ -64,7 +64,9 @@ function checkPasscode(request) {
 export async function onRequestGet({ request }) {
   if (!checkPasscode(request)) return json({ ok: false, error: '口令不对' }, 401);
   try {
-    return json({ ok: true, state: await readState() });
+    // v:3 = 新版云函数（支持信件/成就/计数/时光机/恢复）。
+    // 线上打开 /api/state 看得到 "v":3 才说明新版部署生效了；没有 v 字段 = 还是老版本
+    return json({ ok: true, v: 3, state: await readState() });
   } catch (e) {
     return json({ ok: false, error: String(e) }, 500);
   }
@@ -160,6 +162,67 @@ export async function onRequestPost({ request }) {
       list.forEach((a) => {
         if (a && typeof a.id === 'string') state.achievements[a.id.slice(0, 24)] = now;
       });
+    }
+
+    // 数据恢复：{ restore: { confirm: 'RESTORE-LOVE', state: {...} } }
+    // 用于换网址/换项目后整体迁移数据；字段全部校验+截断，防脏数据
+    if (body.restore && body.restore.confirm === 'RESTORE-LOVE' && body.restore.state && typeof body.restore.state === 'object') {
+      const s = body.restore.state;
+      ['intimacy', 'anger', 'pervert'].forEach((k) => {
+        if (typeof s[k] === 'number') state[k] = Math.max(0, Math.round(s[k]));
+      });
+      if (typeof s.anniversary === 'string') state.anniversary = s.anniversary.slice(0, 10);
+      if (s.counters && typeof s.counters === 'object') {
+        Object.keys(INITIAL.counters).forEach((k) => {
+          if (typeof s.counters[k] === 'number') state.counters[k] = Math.max(0, Math.round(s.counters[k]));
+        });
+      }
+      if (Array.isArray(s.history)) {
+        state.history = s.history
+          .filter((h) => h && typeof h.text === 'string')
+          .slice(0, 200)
+          .map((h) => ({
+            text: String(h.text).slice(0, 80),
+            by: who(h.by),
+            type: String(h.type || 'sys').slice(0, 12),
+            ts: typeof h.ts === 'number' ? Math.round(h.ts) : now,
+          }));
+      }
+      if (Array.isArray(s.letters)) {
+        const seen = new Set();
+        state.letters = s.letters
+          .filter((L) => L && typeof L.text === 'string' && L.text.trim())
+          .slice(0, 200)
+          .map((L, i) => ({
+            id: ((typeof L.id === 'string' && L.id) ? L.id : 'r' + now + '-' + i).slice(0, 40),
+            from: who(L.from),
+            text: L.text.slice(0, 500).trim(),
+            ts: typeof L.ts === 'number' ? Math.round(L.ts) : now,
+            read: !!L.read,
+          }))
+          .filter((L) => !seen.has(L.id) && seen.add(L.id));
+      }
+      if (s.gifts && typeof s.gifts === 'object') {
+        const g = {};
+        Object.entries(s.gifts).forEach(([id, info]) => {
+          if (id && info && typeof info === 'object') {
+            g[id.slice(0, 24)] = { c: Math.max(0, Math.round(Number(info.c) || 0)), by: who(info.by), ts: Math.round(Number(info.ts) || 0) };
+          }
+        });
+        state.gifts = g;
+      }
+      if (s.achievements && typeof s.achievements === 'object') {
+        const a = {};
+        Object.entries(s.achievements).forEach(([id, ts]) => { if (id) a[String(id).slice(0, 24)] = Math.round(Number(ts) || now); });
+        state.achievements = a;
+      }
+      if (Array.isArray(s.ideas)) state.ideas = s.ideas.filter((t) => typeof t === 'string').slice(0, 100);
+      if (typeof s.avatarLiuRev === 'number') state.avatarLiuRev = Math.max(0, Math.round(s.avatarLiuRev));
+      if (typeof s.avatarHongRev === 'number') state.avatarHongRev = Math.max(0, Math.round(s.avatarHongRev));
+      if (typeof s.bgRev === 'number') state.bgRev = Math.max(0, Math.round(s.bgRev));
+      if (s.lastAction && typeof s.lastAction.ts === 'number') {
+        state.lastAction = { type: String(s.lastAction.type || '').slice(0, 16), by: who(s.lastAction.by), ts: Math.round(s.lastAction.ts) };
+      }
     }
 
     await store.setJSON(KEY_STATE, state);
