@@ -658,6 +658,17 @@ body.shake #main-page { animation: shake .45s ease; }
 }
 .send-btn { width: 100%; margin-top: 10px; max-width: none; }
 
+/* ---------------- 数据备份与恢复工具 ---------------- */
+
+.data-card { width: min(340px, 90vw); text-align: left; }
+#data-text {
+  width: 100%; margin-top: 10px; padding: 10px; border-radius: 12px;
+  font-size: 11px; line-height: 1.5; font-family: monospace;
+  background: rgba(255, 255, 255, .1); color: rgba(255, 230, 241, .85);
+  outline: none; resize: vertical; word-break: break-all;
+  border: 1px solid rgba(255, 255, 255, .25);
+}
+
 /* ---------------- 成就庆祝 ---------------- */
 
 #achv-celebrate {

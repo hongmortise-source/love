@@ -1225,6 +1225,138 @@ async function resetBg() {
 }
 
 /* ============================================================
+   🧰 数据备份与恢复（网址后面加 #data 打开）
+   换网址/换手机/云端出意外时，用它可以整机迁移：
+   旧设备导出 → 新设备粘贴导入（数值/成就/信件/头像/背景都带走）
+============================================================ */
+
+function dataLog(msg) { $('data-log').textContent = msg; }
+
+function exportPayload() {
+  return {
+    app: 'love-page', exportedAt: Date.now(), me,
+    state: {
+      intimacy: state.intimacy, anger: state.anger, pervert: state.pervert,
+      anniversary: state.anniversary,
+      avatarLiu: state.avatarLiu, avatarHong: state.avatarHong, bg: state.bg,
+      lastAction: state.lastAction, revCache,
+      counters: state.counters, history: state.history.slice(0, 200),
+      letters: state.letters.slice(0, 200), gifts: state.gifts,
+      achievements: state.achievements, ideas: state.ideas,
+    },
+  };
+}
+
+function summarizeState(st, tag) {
+  if (!st) return `${tag}：读不到`;
+  const achv = st.achievements ? Object.keys(st.achievements).length : 0;
+  const avatars = [];
+  if (st.avatarLiu || st.avatarLiuRev) avatars.push('刘雨凝');
+  if (st.avatarHong || st.avatarHongRev) avatars.push('洪闻锴');
+  return `${tag}：亲密值 ${st.intimacy ?? '?'} · 相爱 ${st.anniversary || '未设置'} · 成就 ${achv} 枚 · 信件 ${(st.letters || []).length} 封 · 记录 ${(st.history || []).length} 条` +
+    (avatars.length ? ` · 头像：${avatars.join('、')}` : ' · 头像：无');
+}
+
+async function checkDataCloud() {
+  dataLog('正在检查…');
+  try {
+    const st = await Cloud.getState();
+    $('data-info').textContent = summarizeState(st, '☁️ 云端数据') + ' —— 云端正常';
+  } catch (e) {
+    $('data-info').textContent = '☁️ 云端连不上（本地模式，或云函数没部署好）';
+  }
+}
+
+function openDataTool() {
+  $('data-tool').classList.remove('hidden');
+  dataLog('');
+  if (Cloud.available === null) Cloud.detect().then(checkDataCloud);
+  else checkDataCloud();
+}
+
+function doExportData() {
+  $('data-text').value = JSON.stringify(exportPayload());
+  dataLog('备份已生成 ☝️ 点「全选复制」保存到备忘录/发给自己，内容包含数值、成就、信件、头像、背景');
+}
+
+function copyDataText() {
+  const ta = $('data-text');
+  if (!ta.value) { dataLog('还没有备份内容，先点「生成本机备份」'); return; }
+  ta.focus(); ta.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch (e) { /* 老内核 */ }
+  if (!ok && navigator.clipboard) {
+    navigator.clipboard.writeText(ta.value).then(() => dataLog('已复制 ✓ 粘贴到备忘录保存好')).catch(() => dataLog('复制失败，长按文字手动全选复制'));
+    return;
+  }
+  dataLog(ok ? '已复制 ✓ 粘贴到备忘录保存好' : '复制失败，长按文字手动全选复制');
+}
+
+function coupleFromExport(st) {
+  return {
+    intimacy: st.intimacy || 0, anger: st.anger || 0, pervert: st.pervert || 0,
+    anniversary: st.anniversary || '',
+    counters: st.counters || {},
+    history: Array.isArray(st.history) ? st.history : [],
+    letters: Array.isArray(st.letters) ? st.letters : [],
+    gifts: st.gifts || {},
+    achievements: st.achievements || {},
+    ideas: Array.isArray(st.ideas) ? st.ideas : null,
+    lastAction: st.lastAction || null,
+    avatarLiuRev: (st.revCache && st.revCache.liu) || 0,
+    avatarHongRev: (st.revCache && st.revCache.hong) || 0,
+    bgRev: (st.revCache && st.revCache.bg) || 0,
+  };
+}
+
+async function importData() {
+  const raw = $('data-text').value.trim();
+  if (!raw) { dataLog('先把备份文字粘贴进来再导入'); return; }
+  let d;
+  try { d = JSON.parse(raw); } catch (e) { dataLog('粘贴的内容不是有效备份（JSON 解析失败）'); return; }
+  const st = d.state || d;   // 兼容两种格式：本工具备份 / 控制台复制的 couple 对象
+  if (typeof st.intimacy !== 'number' && !st.counters) { dataLog('这份内容里没找到数据，确认复制完整了吗？'); return; }
+
+  const target = (Cloud.available === null) ? await Cloud.detect() : Cloud.available;
+  const toCloud = target ? '，并恢复到云端' : '';
+  if (!confirm(`确定把备份写回这台设备${toCloud}吗？当前数据会被覆盖。`)) return;
+
+  // 1. 写回本机（头像/背景/数值立刻回来）
+  try { localStorage.setItem('love_state', JSON.stringify(st)); } catch (e) { dataLog('本机存储写不下（内容太大），试着只恢复云端'); }
+  if (d.me) localStorage.setItem('love_me', d.me);
+
+  // 2. 恢复云端（数值/成就/信件/礼物/时光机一次到位）
+  if (target) {
+    try {
+      await Cloud.writeState({ restore: { confirm: 'RESTORE-LOVE', state: coupleFromExport(st) } });
+      // 3. 头像/背景也搬去云端
+      const imgs = [['liu', st.avatarLiu], ['hong', st.avatarHong], ['bg', st.bg]];
+      for (const [who, data] of imgs) {
+        if (data) { try { await Cloud.writeAvatar(who, data); } catch (e) { /* 稍后手动点头像重传 */ } }
+      }
+    } catch (e) {
+      dataLog('云端恢复失败（本地已写回），稍后可以再点一次「导入恢复」');
+      return;
+    }
+  }
+  dataLog('恢复完成 ✓ 页面马上刷新…');
+  toast('数据恢复完成 💕');
+  setTimeout(() => { location.hash = ''; location.reload(); }, 900);
+}
+
+function bindDataTool() {
+  $('data-check').addEventListener('click', checkDataCloud);
+  $('data-export').addEventListener('click', doExportData);
+  $('data-copy').addEventListener('click', copyDataText);
+  $('data-import').addEventListener('click', importData);
+  $('data-close').addEventListener('click', () => {
+    $('data-tool').classList.add('hidden');
+    if (location.hash === '#data') location.hash = '';
+  });
+  if (location.hash === '#data') openDataTool();   // 网址加 #data 直接打开
+}
+
+/* ============================================================
    事件绑定 & 启动
 ============================================================ */
 
@@ -1326,6 +1458,7 @@ function bindUI() {
   // 成就庆祝：点一下跳过全部
   $('achv-celebrate').addEventListener('click', () => endCelebrate(true));
 
+  bindDataTool();
   bindMusic();
 }
 
