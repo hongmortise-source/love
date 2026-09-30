@@ -6,9 +6,12 @@
   <meta name="theme-color" content="#2a0845">
   <meta name="format-detection" content="telephone=no">
   <title>刘雨凝 ❤ 洪闻锴</title>
-  <link rel="stylesheet" href="style.css?v=20260926b">
+  <link rel="stylesheet" href="style.css?v=20260930b">
 </head>
 <body>
+
+  <!-- 基础夜空背景（亮度调节会作用到这一层） -->
+  <div id="bg-base"></div>
 
   <!-- 自定义背景（换背景功能） -->
   <div id="bg-layer"></div>
@@ -45,6 +48,7 @@
       <button class="icon-btn" id="switch-user" title="切换身份">⇄</button>
       <div class="topbar-title">刘雨凝<span class="heart-glyph">❤</span>洪闻锴</div>
       <div class="top-tools">
+        <button class="icon-btn" id="bright-btn" title="调节亮度">🌞</button>
         <button class="icon-btn" id="zen-btn" title="流星模式">🌠</button>
         <button class="icon-btn" id="bg-btn" title="换背景（长按恢复默认）">🖼</button>
         <button class="icon-btn" id="next-song" title="下一首" hidden>»</button>
@@ -229,6 +233,18 @@
     </div>
   </div>
 
+  <!-- 亮度调节面板 -->
+  <div id="bright-pop" class="hidden">
+    <div class="bright-head"><span>🌞 页面亮度</span><b id="bright-val">100%</b></div>
+    <input type="range" id="bright-range" min="70" max="180" step="5" value="100">
+    <div class="bright-presets">
+      <button data-b="100">默认</button>
+      <button data-b="120">柔和</button>
+      <button data-b="140">明亮</button>
+      <button data-b="165">超亮</button>
+    </div>
+  </div>
+
   <!-- 数据备份与恢复工具（网址后面加 #data 打开） -->
   <div id="data-tool" class="modal hidden">
     <div class="modal-card data-card">
@@ -254,7 +270,7 @@
   <input type="file" id="avatar-file" accept="image/*" hidden>
   <input type="file" id="bg-file" accept="image/*" hidden>
 
-  <script src="config.js?v=20260926b"></script>
-  <script src="app.js?v=20260926b"></script>
+  <script src="config.js?v=20260930b"></script>
+  <script src="app.js?v=20260930b"></script>
 </body>
 </html>

@@ -1243,6 +1243,50 @@ async function resetBg() {
 }
 
 /* ============================================================
+   🌞 亮度调节（右上角按钮，滑块 + 预设，记在本机）
+============================================================ */
+
+const BRIGHT_DEFAULT = 100;
+
+function applyBrightness(v) {
+  const pct = Math.max(70, Math.min(180, Math.round(Number(v) || BRIGHT_DEFAULT)));
+  document.documentElement.style.setProperty('--bright', (pct / 100).toFixed(2));
+  const val = $('bright-val');
+  if (val) val.textContent = pct + '%';
+  const range = $('bright-range');
+  if (range && Number(range.value) !== pct) range.value = pct;
+  document.querySelectorAll('.bright-presets button').forEach((b) => {
+    b.classList.toggle('on', Number(b.dataset.b) === pct);
+  });
+  try { localStorage.setItem('love_bright', String(pct)); } catch (e) { /* 存不下就算了 */ }
+}
+
+function loadBrightness() {
+  let saved = BRIGHT_DEFAULT;
+  try { saved = Number(localStorage.getItem('love_bright')) || BRIGHT_DEFAULT; } catch (e) { /* 忽略 */ }
+  applyBrightness(saved);
+}
+
+function bindBrightness() {
+  const pop = $('bright-pop');
+  const btn = $('bright-btn');
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    pop.classList.toggle('hidden');
+  });
+  $('bright-range').addEventListener('input', (e) => applyBrightness(e.target.value));
+  document.querySelectorAll('.bright-presets button').forEach((b) => {
+    b.addEventListener('click', () => { applyBrightness(b.dataset.b); });
+  });
+  // 点面板以外的地方收起
+  document.addEventListener('click', (e) => {
+    if (pop.classList.contains('hidden')) return;
+    if (pop.contains(e.target) || e.target === btn) return;
+    pop.classList.add('hidden');
+  });
+}
+
+/* ============================================================
    🧰 数据备份与恢复（网址后面加 #data 打开）
    换网址/换手机/云端出意外时，用它可以整机迁移：
    旧设备导出 → 新设备粘贴导入（数值/成就/信件/头像/背景都带走）
@@ -1490,6 +1534,7 @@ function bindUI() {
   $('achv-celebrate').addEventListener('click', () => endCelebrate(true));
 
   bindDataTool();
+  bindBrightness();
   bindMusic();
 }
 
@@ -1497,6 +1542,7 @@ function bindUI() {
   buildBackground();
   bindUI();
   loadLocal();
+  loadBrightness();
   snapshotBaselineAchv();
   renderAll();
   if (me) showMain(); else showLogin();
