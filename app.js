@@ -1194,6 +1194,24 @@ async function onAvatarPicked(file) {
   }
 }
 
+/* 恢复自己的默认头像（清掉云端那条，回退到 assets 里的默认图片） */
+async function resetAvatar() {
+  if (!me) return;
+  if (!confirm('恢复成默认头像？你现在这张上传的头像会被清掉。')) return;
+  state[USERS[me].avatarKey] = '';
+  renderAvatars();
+  saveLocal();
+  if (!Cloud.ok) { toast('已恢复默认头像'); return; }
+  try {
+    const rev = await Cloud.writeAvatar(me, '');
+    revCache[me] = rev;
+    saveLocal();
+    toast('已恢复默认头像，对方也会看到啦');
+  } catch (e) {
+    toast('本机已恢复，云端稍后再试');
+  }
+}
+
 /* 换背景：点一下选图，长按恢复默认 */
 async function onBgPicked(file) {
   try {
@@ -1391,11 +1409,24 @@ function bindUI() {
   // 看看你的
   $('peek-close').addEventListener('click', () => $('peek-modal').classList.add('hidden'));
 
-  // 换头像（点自己的头像）
+  // 换头像：点一下选图 / 长按恢复默认
+  let avLongPressed = false;
   document.querySelectorAll('.avatar-wrap').forEach((wrap) => {
+    const isMine = () => wrap.closest('.avatar-block').id.replace('block-', '') === me;
+    let avTimer = null;
+    const avStart = () => {
+      avLongPressed = false;
+      avTimer = setTimeout(() => { avTimer = null; avLongPressed = true; if (isMine()) resetAvatar(); }, 550);
+    };
+    const avEnd = () => { if (avTimer) { clearTimeout(avTimer); avTimer = null; } };
+    wrap.addEventListener('touchstart', avStart, { passive: true });
+    wrap.addEventListener('touchend', avEnd);
+    wrap.addEventListener('touchcancel', avEnd);
+    wrap.addEventListener('mousedown', avStart);
+    wrap.addEventListener('mouseup', avEnd);
     wrap.addEventListener('click', () => {
-      const user = wrap.closest('.avatar-block').id.replace('block-', '');
-      if (user !== me) { toast('只能换自己的头像哦'); return; }
+      if (avLongPressed) { avLongPressed = false; return; }   // 长按刚触发过，不要再弹选图
+      if (!isMine()) { toast('只能换自己的头像哦'); return; }
       $('avatar-file').click();
     });
   });
